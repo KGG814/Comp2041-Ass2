@@ -4,9 +4,13 @@
 # http://www.cse.unsw.edu.au/~cs2041/assignments/mekong/
 
 use CGI qw/:all/;
+use CGI::Cookie;
+use CGI::Carp qw(warningsToBrowser fatalsToBrowser); 
 
-$debug = 0;
+warningsToBrowser(1);
+$debug = 1;
 $| = 1;
+%cookies = fetch CGI::Cookie;
 
 if (!@ARGV) {
 	# run as a CGI script
@@ -18,13 +22,7 @@ if (!@ARGV) {
 }
 exit 0;
 
-# This is very simple CGI code that goes straight
-# to the search screen and it doesn't format the
-# search results at all
-
-# This is very simple CGI code that goes straight
-# to the search screen and it doesn't format the
-# search results at all
+# Reads page and search_results params and serves appropriate webpage
 
 sub cgi_main {
 	
@@ -34,7 +32,9 @@ sub cgi_main {
 
 	my $page = param('page');
 	print page_header($page);
-	if (! defined $page) {
+	if (defined param('searchTerms')) {
+		print search_results(param('searchTerms'));
+	} elsif (! defined $page) {
 		print home_page();
 	} elsif ($page eq "Search") {
 		print search_form();
@@ -104,7 +104,7 @@ sub search_form {
   		</div>
 
   		<div class="form-group">
-    		<input type="password" class="form-control" name="productID" placeholder="Product ID">
+    		<input type="text" class="form-control" name="productID" placeholder="Product ID">
   		</div>
 
   		<div class="checkbox">
@@ -113,7 +113,7 @@ sub search_form {
     		</label>
   		</div>
 
-  		<button type="submit" class="btn btn-default">Submit</button>
+  		<button type="submit" class="btn btn-default" name="page" value="Results">Submit</button>
 	</form>
 	</div> <!-- .hero-unit -->
 	</div> <!-- /container -->
@@ -127,12 +127,16 @@ sub search_results {
 	my @matching_isbns = search_books($search_terms);
 	my $descriptions = get_book_descriptions(@matching_isbns);
 	return <<eof;
-	<p>$search_terms
-	<p>@matching_isbns
-	<pre>
-		$descriptions
-	</pre>
-	<p>
+	<div class="container">
+	<div class="hero-unit">
+		<p>Search results for \"$search_terms\"
+		<p>@matching_isbns
+		<pre>
+			$descriptions
+		</pre>
+		<p>
+	</div> <!-- .hero-unit -->
+	</div> <!-- /container -->
 eof
 }
 

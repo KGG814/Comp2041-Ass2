@@ -4,9 +4,13 @@
 # http://www.cse.unsw.edu.au/~cs2041/assignments/mekong/
 
 use CGI qw/:all/;
+use CGI::Cookie;
+use CGI::Carp qw(warningsToBrowser fatalsToBrowser); 
 
-$debug = 0;
+warningsToBrowser(1);
+$debug = 1;
 $| = 1;
+%cookies = fetch CGI::Cookie;
 
 if (!@ARGV) {
 	# run as a CGI script
@@ -18,48 +22,70 @@ if (!@ARGV) {
 }
 exit 0;
 
-# This is very simple CGI code that goes straight
-# to the search screen and it doesn't format the
-# search results at all
-
-# This is very simple CGI code that goes straight
-# to the search screen and it doesn't format the
-# search results at all
+# Reads page and search_results params and serves appropriate webpage
 
 sub cgi_main {
-	print page_header();
+	
 	
 	set_global_variables();
 	read_books($books_file);
 
-	my $login = param('login');
-	my $search_terms = param('search_terms');
-	
-	if (defined $search_terms) {
-		print search_results($search_terms);
-	} elsif (defined $login) {
+	my $page = param('page');
+	print page_header($page);
+	if (defined param('searchTerms')) {
+		print search_results(param('searchTerms'));
+	} elsif (! defined $page) {
+		print home_page();
+	} elsif ($page eq "Search") {
 		print search_form();
-	} else {
+	} elsif ($page eq "Login") {
 		print login_form();
 	}
 	
 	print page_trailer();
 }
 
+
+# simple login form without authentication	
+sub home_page {
+	return <<eof;
+	<div class="container">
+	<p></p>
+	</div> <!-- /container -->
+	<div class="container">
+    	<div class="hero-unit">
+	    <h1>Mekong</h1>
+	    <p>Tagline</p>
+	    <p>
+	    </a>
+	    </p>
+    	</div><!-- .hero-unit -->
+	</div> <!-- /container -->
+
+eof
+}
+
+
 # simple login form without authentication	
 sub login_form {
 	return <<eof;
 
 	<div class="container">
+		<div class="span3">
+		</div><!-- .span3 -->
 
+		<div class="span6">
 		<div class="hero-unit">
-		<form class="form-signin">
-		<h2 class="form-signin-heading">Sign in</h2>
-		<input type="text" class="input-block-level" placeholder="Login" name="login">
-		<button class="btn btn-large btn-primary" type="submit">Sign in</button>
-		</form>
+			<form class="form-signin">
+			<h2 class="form-signin-heading">Sign in</h2>
+			<input type="text" class="input-block-level" placeholder="Login" name="login">
+			<button class="btn btn-large btn-primary" type="submit" >Submit</button>
+			</form>
+		</div><!-- .hero-unit -->
+		</div><!-- .span6 -->
 
-	</div><!-- .hero-unit -->
+		<div class="span3">
+		</div><!-- .span3 -->
 	</div> <!-- /container -->
 
 
@@ -70,11 +96,28 @@ eof
 # simple search form
 sub search_form {
 	return <<eof;
-	<p>
-	<form>
-		search: <input type="text" name="search_terms" size=60></input>
+	<div class="container">
+	<div class="hero-unit">
+	<form role="form">
+  		<div class="form-group">
+    		<input type="text" class="form-control" name="searchTerms" placeholder="Product Name">
+  		</div>
+
+  		<div class="form-group">
+    		<input type="text" class="form-control" name="productID" placeholder="Product ID">
+  		</div>
+
+  		<div class="checkbox">
+    		<label>
+      		<input type="checkbox"> Checkbox
+    		</label>
+  		</div>
+
+  		<button type="submit" class="btn btn-default" name="page" value="Results">Submit</button>
 	</form>
-	<p>
+	</div> <!-- .hero-unit -->
+	</div> <!-- /container -->
+
 eof
 }
 
@@ -84,12 +127,16 @@ sub search_results {
 	my @matching_isbns = search_books($search_terms);
 	my $descriptions = get_book_descriptions(@matching_isbns);
 	return <<eof;
-	<p>$search_terms
-	<p>@matching_isbns
-	<pre>
-		$descriptions
-	</pre>
-	<p>
+	<div class="container">
+	<div class="hero-unit">
+		<p>Search results for \"$search_terms\"
+		<p>@matching_isbns
+		<pre>
+			$descriptions
+		</pre>
+		<p>
+	</div> <!-- .hero-unit -->
+	</div> <!-- /container -->
 eof
 }
 
@@ -97,6 +144,17 @@ eof
 # HTML at top of every screen
 #
 sub page_header() {
+	my $login = "";
+	my $search = "";
+	my $help = "";
+	my $arg = shift;
+	if ($arg eq "Login") {
+	   $login = "active";
+	} elsif ($arg eq "Search") {
+	   $search = "active";
+	} elsif ($arg eq "Help") {
+	   $help = "active";
+	}
 	return <<eof;
 Content-Type: text/html
 
@@ -104,11 +162,41 @@ Content-Type: text/html
 <html lang="en">
 <head>
 	<title>mekong</title>
-	<link href="css/new.css" rel="stylesheet">
-	<script src="js/bootstrap.min.js"></script>
+	<link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/css/bootstrap-combined.min.css" rel="stylesheet">
+	
 </head>
 <body>
+<div class="container">
+   <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <a class="brand" href="./mekong.cgi">Mekong</a>
+          <div class="nav-collapse collapse">
+            <ul class="nav">
+              <li class="$login">
+                <a href="./mekong.cgi?page=Login">Login</a>
+              </li>
+              <li class="$search">
+                <a href="./mekong.cgi?page=Search">Advanced Search</a>
+              </li>
+              <li class="$help">
+                <a href="./mekong.cgi?page=Help">Help</a>
+              </li>
+
+            </ul>
+          </div>
+	  <div class="nav-collapse collapse">
+              <form class="navbar-search pull-right">
+    		<input type="text" class="search-query" placeholder="Search">
+    	      </form>
+  	  </div>
+	</div>
+      </div>
+   </div>
+</div> <!-- /container -->
 eof
+
+
 }
 
 #
@@ -123,7 +211,7 @@ sub page_trailer() {
 	
 	return <<eof;
 	$debugging_info
-	</div>
+	<script src="js/bootstrap.min.js"></script>
 <body>
 </html>
 eof
