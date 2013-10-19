@@ -4,19 +4,21 @@
 # http://www.cse.unsw.edu.au/~cs2041/assignments/mekong/
 
 use CGI qw/:all/;
-use CGI::Cookie;
+use CGI::Cookies;
 use CGI::Carp qw(warningsToBrowser fatalsToBrowser); 
+use Storable;
 
 warningsToBrowser(1);
 $debug = 1;
 $| = 1;
-%cookies = fetch CGI::Cookie;
+
 
 if (!@ARGV) {
 	# run as a CGI script
 	cgi_main();
 	
 } else {
+	
 	# for debugging purposes run from the command line
 	console_main();
 }
@@ -25,28 +27,103 @@ exit 0;
 # Reads page and search_results params and serves appropriate webpage
 
 sub cgi_main {
-	
-	
-	set_global_variables();
-	read_books($books_file);
+   # Set some variables
+   set_global_variables();
+   # Read in books
+   read_books($books_file);
+   # Setup Cookies
+	$cookies_file = "./.cookies";
+   eval '$status = retrieve($cookies_file)';
+	if ($status) {
+      %cookies_db = %{retrieve($cookies_file)};
+   }
+   # Get Page
+   my $page = param('page');
 
-	my $page = param('page');
-	print page_header($page);
+   	# Defaults to home
+	if (! defined $page) {
+		$page = "Home"
+	}
+   # Get the user's cookie
+   $user_cookie = (CGI::Cookie->fetch)[1];
+   # Check if their cookie exists in system and they are logged in, or give
+   # them a cookie if they just logged in and they don't have one
+   if ($page eq "postLogin") {
+      $cookie = validate_cookie();
+   } else {
+      $cookie = check_cookie($user_cookie);
+   }
+   
+	
+
+   
+   # Determines which header to give, depending on if they are logged in
+	if (defined $cookie) {
+      $value = $cookie->value;
+      if ( $value eq 'loggedIn') {
+		   print page_header_user($page, $cookie);
+      } else {
+         print page_header_noUser($page, $cookie);
+      }
+   } else {
+		print page_header_noUser($page, $cookie);
+	}
 	if (defined param('searchTerms')) {
 		print search_results(param('searchTerms'));
-	} elsif (! defined $page) {
+	} elsif ($page eq "Home") {
 		print home_page();
 	} elsif ($page eq "Search") {
 		print search_form();
 	} elsif ($page eq "Login") {
 		print login_form();
+	} elsif ($page eq "postLogin") {
+
+		if ($cookies_db{param('login')}) {
+			$cookie = $cookies_db{'login'};
+		} else {
+         $cookie = new_cookie();
+         $cookies_db{'login'} = $cookie;
+      }
+      store(\%cookies_db, $cookies_file);	
 	}
 	
 	print page_trailer();
 }
 
 
-# simple login form without authentication	
+sub new_cookie {
+	my $c = CGI::Cookie->new(-name    =>  param('login'), \
+                            -value   =>  'loggedOut');
+   $cookies_db{param('login')} = $c;
+	return $c
+
+}
+
+# Run when login to give them an existing cookie or make a new one
+sub validate_cookie {
+   $name = param('login');
+   $cookie = $cookies_db{$name};
+   if (! defined $cookie) {
+      $cookie = new_cookie();
+   }  
+   $cookie->value('loggedIn');
+}
+
+# Checks if the given cookie exists in db and that it is logged in.
+sub check_cookie {
+   $user_cookie = shift;
+   if ($user_cookie) {
+      $check_cookie = $cookies_db{$user_cookie->name};
+      if ($check_cookie) {
+         if ($check_cookie->value eq "loggedIn") {
+            $cookie = $check_cookie;
+         }
+      }
+   }
+   return $cookie;
+}
+
+# Home	
 sub home_page {
 	return <<eof;
 	<div class="container">
@@ -79,7 +156,7 @@ sub login_form {
 			<form class="form-signin">
 			<h2 class="form-signin-heading">Sign in</h2>
 			<input type="text" class="input-block-level" placeholder="Login" name="login">
-			<button class="btn btn-large btn-primary" type="submit" >Submit</button>
+			<button class="btn btn-large btn-primary" type="submit" name="page" value="postLogin">Submit</button>
 			</form>
 		</div><!-- .hero-unit -->
 		</div><!-- .span6 -->
@@ -92,6 +169,9 @@ sub login_form {
 
 eof
 }
+
+
+
 
 # simple search form
 sub search_form {
@@ -141,13 +221,14 @@ eof
 }
 
 #
-# HTML at top of every screen
+# HTML at top of every screen, if no user is logged in
 #
-sub page_header() {
+sub page_header_noUser() {
 	my $login = "";
 	my $search = "";
 	my $help = "";
 	my $arg = shift;
+   my $cookie = shift;
 	if ($arg eq "Login") {
 	   $login = "active";
 	} elsif ($arg eq "Search") {
@@ -155,9 +236,12 @@ sub page_header() {
 	} elsif ($arg eq "Help") {
 	   $help = "active";
 	}
+   if ($cookie) {
+	   print header(-cookie=>$cookie);
+   } else {
+      print header;
+   }
 	return <<eof;
-Content-Type: text/html
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -196,8 +280,71 @@ Content-Type: text/html
 </div> <!-- /container -->
 eof
 
+}
+
+
+#
+# HTML at top of every screen, if the user is logged in
+#
+sub page_header_user() {
+	my $user = "";
+	my $search = "";
+	my $help = "";
+	my $arg = shift;
+   my $cookie = shift;
+	if ($arg eq "User") {
+	   $user = "active";
+	} elsif ($arg eq "Search") {
+	   $search = "active";
+	} elsif ($arg eq "Help") {
+	   $help = "active";
+	}
+	if ($cookie) {
+	   print header(-cookie=>$cookie);
+   } else {
+      print header;
+   }
+	return <<eof;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>mekong</title>
+	<link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/css/bootstrap-combined.min.css" rel="stylesheet">
+	
+</head>
+<body>
+<div class="container">
+   <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <a class="brand" href="./mekong.cgi">Mekong</a>
+          <div class="nav-collapse collapse">
+            <ul class="nav">
+              <li class="$user">
+                <a href="./mekong.cgi?page=Login">Login</a>
+              </li>
+              <li class="$search">
+                <a href="./mekong.cgi?page=Search">Advanced Search</a>
+              </li>
+              <li class="$help">
+                <a href="./mekong.cgi?page=Help">Help</a>
+              </li>
+
+            </ul>
+          </div>
+	  <div class="nav-collapse collapse">
+              <form class="navbar-search pull-right">
+    		<input type="text" class="search-query" placeholder="Search">
+    	      </form>
+  	  </div>
+	</div>
+      </div>
+   </div>
+</div> <!-- /container -->
+eof
 
 }
+
 
 #
 # HTML at bottom of every screen
@@ -207,11 +354,10 @@ sub page_trailer() {
 	if ($debug) {
 		$debugging_info = debugging_info();
 	}
-		
-	
+
 	return <<eof;
 	$debugging_info
-	<script src="js/bootstrap.min.js"></script>
+	$status
 <body>
 </html>
 eof
@@ -222,18 +368,14 @@ eof
 #
 sub debugging_info() {
 	my $params = "";
+  
 	foreach $p (param()) {
 		$params .= "param($p)=".param($p)."\n"
 	}
-
-	return <<eof;
-<hr>
-<h4>Debugging information - parameter values supplied to $0</h4>
-<pre>
-$params
-</pre>
-<hr>
-eof
+   
+	print "<hr>\n<h4>Debugging information - parameter values supplied to $0</h4>\n<pre>";
+   print $params;
+   print "</pre>\n<hr>"
 }
 
 
@@ -915,6 +1057,7 @@ orders
 quit
 eof
 }
+
 
 
 
