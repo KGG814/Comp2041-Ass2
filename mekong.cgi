@@ -4,7 +4,7 @@
 # http://www.cse.unsw.edu.au/~cs2041/assignments/mekong/
 
 use CGI qw/:all/;
-use CGI::Cookies;
+use CGI::Cookie;
 use CGI::Carp qw(warningsToBrowser fatalsToBrowser); 
 use Storable;
 
@@ -30,12 +30,10 @@ sub cgi_main {
    # Set some variables
    set_global_variables();
    # Read in books
-   read_books($books_file);
    # Setup Cookies
-	$cookies_file = "./.cookies";
-   eval '$status = retrieve($cookies_file)';
+	$cookies_file = `cat ./.cookies`;
 	if ($status) {
-      %cookies_db = %{retrieve($cookies_file)};
+      %cookies_db = CGI::Cookie->parse($cookies_file);
    }
    # Get Page
    my $page = param('page');
@@ -45,7 +43,7 @@ sub cgi_main {
 		$page = "Home"
 	}
    # Get the user's cookie
-   $user_cookie = (CGI::Cookie->fetch)[1];
+   $user_cookie = (CGI::Cookie->fetch)[0];
    # Check if their cookie exists in system and they are logged in, or give
    # them a cookie if they just logged in and they don't have one
    if ($page eq "postLogin") {
@@ -58,16 +56,17 @@ sub cgi_main {
 
    
    # Determines which header to give, depending on if they are logged in
-	if (defined $cookie) {
-      $value = $cookie->value;
-      if ( $value eq 'loggedIn') {
+   if (defined $cookie) {
+      if ( $cookie->value eq 'loggedIn') {
 		   print page_header_user($page, $cookie);
       } else {
          print page_header_noUser($page, $cookie);
       }
    } else {
 		print page_header_noUser($page, $cookie);
-	}
+   }
+
+   read_books($books_file);
 	if (defined param('searchTerms')) {
 		print search_results(param('searchTerms'));
 	} elsif ($page eq "Home") {
@@ -77,13 +76,6 @@ sub cgi_main {
 	} elsif ($page eq "Login") {
 		print login_form();
 	} elsif ($page eq "postLogin") {
-
-		if ($cookies_db{param('login')}) {
-			$cookie = $cookies_db{'login'};
-		} else {
-         $cookie = new_cookie();
-         $cookies_db{'login'} = $cookie;
-      }
       store(\%cookies_db, $cookies_file);	
 	}
 	
@@ -107,6 +99,7 @@ sub validate_cookie {
       $cookie = new_cookie();
    }  
    $cookie->value('loggedIn');
+	return $cookie;
 }
 
 # Checks if the given cookie exists in db and that it is logged in.
@@ -357,7 +350,6 @@ sub page_trailer() {
 
 	return <<eof;
 	$debugging_info
-	$status
 <body>
 </html>
 eof
@@ -375,6 +367,7 @@ sub debugging_info() {
    
 	print "<hr>\n<h4>Debugging information - parameter values supplied to $0</h4>\n<pre>";
    print $params;
+	print $cookie->value;
    print "</pre>\n<hr>"
 }
 
