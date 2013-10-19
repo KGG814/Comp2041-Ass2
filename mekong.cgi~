@@ -4,7 +4,8 @@
 # http://www.cse.unsw.edu.au/~cs2041/assignments/mekong/
 
 use CGI qw/:all/;
-use CGI::Cookies;
+use CGI;
+use CGI::Cookie;
 use CGI::Carp qw(warningsToBrowser fatalsToBrowser); 
 use Storable;
 
@@ -30,13 +31,11 @@ sub cgi_main {
    # Set some variables
    set_global_variables();
    # Read in books
-   read_books($books_file);
    # Setup Cookies
-	$cookies_file = "./.cookies";
-   eval '$status = retrieve($cookies_file)';
-	if ($status) {
-      %cookies_db = %{retrieve($cookies_file)};
-   }
+	$cookies_file = `cat ./cookies`;
+   $cookies_path = './cookies';
+   %cookies_db = CGI::Cookie->parse($cookies_file);
+
    # Get Page
    my $page = param('page');
 
@@ -45,7 +44,12 @@ sub cgi_main {
 		$page = "Home"
 	}
    # Get the user's cookie
-   $user_cookie = (CGI::Cookie->fetch)[1];
+   %user_cookie_list = CGI::Cookie->fetch;
+   $key = ( sort keys %user_cookie_list )[0];
+   if (exists $user_cookie_list{$key}) {
+      $user_cookie = $user_cookie_list{$key};
+      bless $user_cookie, CGI::Cookie;
+   }
    # Check if their cookie exists in system and they are logged in, or give
    # them a cookie if they just logged in and they don't have one
    if ($page eq "postLogin") {
@@ -53,21 +57,22 @@ sub cgi_main {
    } else {
       $cookie = check_cookie($user_cookie);
    }
-   
+   bless $cookie, CGI::Cookie if defined $cookie;
 	
 
    
    # Determines which header to give, depending on if they are logged in
-	if (defined $cookie) {
-      $value = $cookie->value;
-      if ( $value eq 'loggedIn') {
+   if (defined $cookie) {
+      if ( $cookie->value eq 'loggedIn') {
 		   print page_header_user($page, $cookie);
       } else {
          print page_header_noUser($page, $cookie);
       }
    } else {
 		print page_header_noUser($page, $cookie);
-	}
+   }
+
+   read_books($books_file);
 	if (defined param('searchTerms')) {
 		print search_results(param('searchTerms'));
 	} elsif ($page eq "Home") {
@@ -77,14 +82,7 @@ sub cgi_main {
 	} elsif ($page eq "Login") {
 		print login_form();
 	} elsif ($page eq "postLogin") {
-
-		if ($cookies_db{param('login')}) {
-			$cookie = $cookies_db{'login'};
-		} else {
-         $cookie = new_cookie();
-         $cookies_db{'login'} = $cookie;
-      }
-      store(\%cookies_db, $cookies_file);	
+      store \%cookies_db, $cookies_path;	
 	}
 	
 	print page_trailer();
@@ -92,28 +90,31 @@ sub cgi_main {
 
 
 sub new_cookie {
-	my $c = CGI::Cookie->new(-name    =>  param('login'), \
-                            -value   =>  'loggedOut');
+	my $c = CGI::Cookie->new(-name => param('login'), -value => 'loggedOut');
    $cookies_db{param('login')} = $c;
-	return $c
-
+   print $c->value;
+	return $c;
 }
 
 # Run when login to give them an existing cookie or make a new one
 sub validate_cookie {
-   $name = param('login');
-   $cookie = $cookies_db{$name};
-   if (! defined $cookie) {
-      $cookie = new_cookie();
-   }  
-   $cookie->value('loggedIn');
+   $name = param('login');      
+   if (! exists $cookies_db{$name}) {
+      $validcookie = new_cookie();
+   } else {
+      $validcookie = CGI::Cookie->parse($cookies_db{$name});
+   }
+   bless $validcookie, CGI::Cookie;
+   $validcookie->value('loggedIn');
+	return $validcookie;
 }
 
 # Checks if the given cookie exists in db and that it is logged in.
 sub check_cookie {
-   $user_cookie = shift;
-   if ($user_cookie) {
-      $check_cookie = $cookies_db{$user_cookie->name};
+   $user = CGI::Cookie->parse($_[0]);
+   bless $user, CGI::Cookie;
+   if ($user) {
+      $check_cookie = CGI::Cookie->parse($cookies_db{$user->name});
       if ($check_cookie) {
          if ($check_cookie->value eq "loggedIn") {
             $cookie = $check_cookie;
@@ -229,6 +230,7 @@ sub page_header_noUser() {
 	my $help = "";
 	my $arg = shift;
    my $cookie = shift;
+   bless $cookie, CGI::Cookie if defined $cookie;
 	if ($arg eq "Login") {
 	   $login = "active";
 	} elsif ($arg eq "Search") {
@@ -292,6 +294,7 @@ sub page_header_user() {
 	my $help = "";
 	my $arg = shift;
    my $cookie = shift;
+   bless $cookie, CGI::Cookie if defined $cookie;
 	if ($arg eq "User") {
 	   $user = "active";
 	} elsif ($arg eq "Search") {
@@ -299,18 +302,15 @@ sub page_header_user() {
 	} elsif ($arg eq "Help") {
 	   $help = "active";
 	}
-	if ($cookie) {
-	   print header(-cookie=>$cookie);
-   } else {
-      print header;
-   }
 	return <<eof;
+$header
 <!DOCTYPE html>
 <html lang="en">
 <head>
 	<title>mekong</title>
 	<link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/css/bootstrap-combined.min.css" rel="stylesheet">
-	
+	Set-Cookie: $cookie
+   Content-Type: text/html;
 </head>
 <body>
 <div class="container">
@@ -321,7 +321,7 @@ sub page_header_user() {
           <div class="nav-collapse collapse">
             <ul class="nav">
               <li class="$user">
-                <a href="./mekong.cgi?page=Login">Login</a>
+                <a href="./mekong.cgi?page=Login">User</a>
               </li>
               <li class="$search">
                 <a href="./mekong.cgi?page=Search">Advanced Search</a>
@@ -357,8 +357,7 @@ sub page_trailer() {
 
 	return <<eof;
 	$debugging_info
-	$status
-<body>
+</body>
 </html>
 eof
 }
@@ -375,6 +374,8 @@ sub debugging_info() {
    
 	print "<hr>\n<h4>Debugging information - parameter values supplied to $0</h4>\n<pre>";
    print $params;
+   print "Cookie: ", $cookie, "\n";
+   #print "User Cookie: ", $user_cookie->name, "\n";
    print "</pre>\n<hr>"
 }
 
