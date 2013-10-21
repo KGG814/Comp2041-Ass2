@@ -14,15 +14,14 @@ $debug = 1;
 $| = 1;
 
 
-if (!@ARGV) {
+#if (!@ARGV) {
 	# run as a CGI script
 	cgi_main();
 	
-} else {
-	
+#} else {
 	# for debugging purposes run from the command line
-	console_main();
-}
+	#console_main();
+#}
 exit 0;
 
 # Reads page and search_results params and serves appropriate webpage
@@ -32,44 +31,37 @@ sub cgi_main {
    set_global_variables();
    # Read in books
    # Setup Cookies
-	$cookies_file = `cat ./cookies`;
-   $cookies_path = './cookies';
-   %cookies_db = CGI::Cookie->parse($cookies_file);
-
+   $cookies_path = 'cookies';
+	$status = eval '%{retrieve($cookies_path)}';
+	%cookies_db = %{retrieve($cookies_path)} if defined $status;
    # Get Page
    my $page = param('page');
 
    	# Defaults to home
 	if (! defined $page) {
-		$page = "Home"
+		$page = "Home";
 	}
    # Get the user's cookie
    %user_cookie_list = CGI::Cookie->fetch;
    $key = ( sort keys %user_cookie_list )[0];
-   if (exists $user_cookie_list{$key}) {
-      $user_cookie = $user_cookie_list{$key};
-      bless $user_cookie, CGI::Cookie;
+   if (defined $key) {
+		$cookie = $user_cookie_list{$key};
    }
    # Check if their cookie exists in system and they are logged in, or give
    # them a cookie if they just logged in and they don't have one
-   if ($page eq "postLogin") {
-      $cookie = validate_cookie();
-   } else {
-      $cookie = check_cookie($user_cookie);
-   }
-   bless $cookie, CGI::Cookie if defined $cookie;
-	
-
+	if ($page eq "postLogin") {
+	   $cookie = validate_cookie();
+	} else {
+	   $cookie = check_cookie($cookie);
+	}
+	bless $cookie, CGI::Cookie if defined $cookie;
    
    # Determines which header to give, depending on if they are logged in
-   if (defined $cookie) {
-      if ( $cookie->value eq 'loggedIn') {
-		   print page_header_user($page, $cookie);
-      } else {
-         print page_header_noUser($page, $cookie);
-      }
-   } else {
+   if (defined $cookie & ! ($page eq "logOut") ) {				
+	   print page_header_user($page, $cookie);
+   } else {	
 		print page_header_noUser($page, $cookie);
+		
    }
 
    read_books($books_file);
@@ -83,6 +75,10 @@ sub cgi_main {
 		print login_form();
 	} elsif ($page eq "postLogin") {
       store \%cookies_db, $cookies_path;	
+	} elsif ($page eq "logOut") {
+     	delete $cookies_db{$cookie->value};
+		print home_page(); 
+		store \%cookies_db, $cookies_path
 	}
 	
 	print page_trailer();
@@ -90,9 +86,8 @@ sub cgi_main {
 
 
 sub new_cookie {
-	my $c = CGI::Cookie->new(-name => param('login'), -value => 'loggedOut');
+	my $c = CGI::Cookie->new(-name => 'name', -value => param('login'));
    $cookies_db{param('login')} = $c;
-   print $c->value;
 	return $c;
 }
 
@@ -105,23 +100,30 @@ sub validate_cookie {
       $validcookie = CGI::Cookie->parse($cookies_db{$name});
    }
    bless $validcookie, CGI::Cookie;
-   $validcookie->value('loggedIn');
 	return $validcookie;
 }
 
 # Checks if the given cookie exists in db and that it is logged in.
 sub check_cookie {
-   $user = CGI::Cookie->parse($_[0]);
-   bless $user, CGI::Cookie;
-   if ($user) {
-      $check_cookie = CGI::Cookie->parse($cookies_db{$user->name});
-      if ($check_cookie) {
-         if ($check_cookie->value eq "loggedIn") {
-            $cookie = $check_cookie;
-         }
-      }
-   }
-   return $cookie;
+	if (defined $_[0]) {
+		$user = $_[0];
+		bless $user, CGI::Cookie;
+		if (defined $user) {
+			my $name = $user->value;
+		   $check_cookie = $cookies_db{$name};
+			
+		   if (defined $check_cookie) {
+				bless $check_cookie, CGI::Cookie;
+		      $return_cookie = $check_cookie;
+
+		   } else {
+				undef $return_cookie;
+			}
+		}
+	} else {
+		undef $return_cookie;
+	}
+   return $return_cookie;
 }
 
 # Home	
@@ -238,7 +240,7 @@ sub page_header_noUser() {
 	} elsif ($arg eq "Help") {
 	   $help = "active";
 	}
-   if ($cookie) {
+   if (defined $cookie) {
 	   print header(-cookie=>$cookie);
    } else {
       print header;
@@ -310,8 +312,6 @@ $header
 <head>
 	<title>mekong</title>
 	<link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/css/bootstrap-combined.min.css" rel="stylesheet">
-	Set-Cookie: $cookie
-   Content-Type: text/html;
 </head>
 <body>
 <div class="container">
@@ -329,6 +329,9 @@ $header
               </li>
               <li class="$help">
                 <a href="./mekong.cgi?page=Help">Help</a>
+              </li>
+				  <li class="">
+                <a href="./mekong.cgi?page=logOut">Logout</a>
               </li>
 
             </ul>
@@ -355,7 +358,6 @@ sub page_trailer() {
 	if ($debug) {
 		$debugging_info = debugging_info();
 	}
-
 	return <<eof;
 	$debugging_info
 </body>
@@ -374,10 +376,14 @@ sub debugging_info() {
 	}
    
 	print "<hr>\n<h4>Debugging information - parameter values supplied to $0</h4>\n<pre>";
+	print "key of current user ", $key, "\n" if defined $key; 
+	print "User cookie: ", $user_cookie_list{$key}, "\n" if defined $key;
+	print "cookies: ", keys %cookies_db, "\n";
+	print "return cookie: ", $return_cookie, "\n" if defined $return_cookie;
+	print "name: ", $user->value, "\n" if defined $user;
    print $params;
-   print "Cookie: ", $cookie, "\n";
-   #print "User Cookie: ", $user_cookie->name, "\n";
-   print "</pre>\n<hr>"
+   print "Cookie: ", $cookie, "\n" if defined $cookie;
+	print "</pre>";
 }
 
 
