@@ -6,22 +6,14 @@
 use CGI qw/:all/;
 use CGI;
 use CGI::Cookie;
-use CGI::Carp qw(warningsToBrowser fatalsToBrowser); 
+use CGI::Carp qw(warningsToBrowser fatalsToBrowser);
+use HTML::Template;
 use Storable;
 
 warningsToBrowser(1);
 $debug = 1;
 $| = 1;
-
-
-#if (!@ARGV) {
-	# run as a CGI script
-	cgi_main();
-	
-#} else {
-	# for debugging purposes run from the command line
-	#console_main();
-#}
+cgi_main();
 exit 0;
 
 # Reads page and search_results params and serves appropriate webpage
@@ -31,40 +23,49 @@ sub cgi_main {
    set_global_variables();
    # Read in books
    # Setup Cookies
-   $cookies_path = 'cookies';
-	$status = eval '%{retrieve($cookies_path)}';
+   my $cookies_path = 'cookies';
+	my $status = eval '%{retrieve($cookies_path)}';
+	my $received_cookie;
 	%cookies_db = %{retrieve($cookies_path)} if defined $status;
+
+	$valid = 0;
+
    # Get Page
    my $page = param('page');
 
-   	# Defaults to home
+   # Defaults to home
 	if (! defined $page) {
 		$page = "Home";
 	}
+
    # Get the user's cookie
    %user_cookie_list = CGI::Cookie->fetch;
-   $key = ( sort keys %user_cookie_list )[0];
-   if (defined $key) {
-		$cookie = $user_cookie_list{$key};
-   }
-   # Check if their cookie exists in system and they are logged in, or give
-   # them a cookie if they just logged in and they don't have one
-	if ($page eq "postLogin") {
-	   $cookie = validate_cookie();
-	} else {
-	   $cookie = check_cookie($cookie);
+	for $key (keys %user_cookie_list) {
+		if ($key eq "Username") {
+			$received_cookie = $user_cookie_list{"Username"};
+		}
 	}
-	bless $cookie, CGI::Cookie if defined $cookie;
-   
+   # Check if their cookie exists in system and they are logged in, or give
+   # them a cookie if they just logged in
+	if ($page eq "postLogin") {
+	   $send_cookie = give_cookie(param('login'), param('password'));
+	} else {
+	   $valid = check_cookie($received_cookie) if defined $received_cookie;
+	}
+	bless $send_cookie, CGI::Cookie if defined $send_cookie;
    # Determines which header to give, depending on if they are logged in
-   if (defined $cookie & ! ($page eq "logOut") ) {				
-	   print page_header_user($page, $cookie);
-   } else {	
-		print page_header_noUser($page, $cookie);
-		
+   if (defined $send_cookie) {			
+		if ($page eq "postLogin") {				
+	   	page_header_user($page, $send_cookie);
+		}
+   } elsif ($valid and $page ne 'logOut') {	
+		page_header_user($page);
+	} else {
+		page_header_noUser($page);
    }
 
    read_books($books_file);
+	
 	if (defined param('searchTerms')) {
 		print search_results(param('searchTerms'));
 	} elsif ($page eq "Home") {
@@ -74,9 +75,15 @@ sub cgi_main {
 	} elsif ($page eq "Login") {
 		print login_form();
 	} elsif ($page eq "postLogin") {
-      store \%cookies_db, $cookies_path;	
+		
+      store \%cookies_db, $cookies_path;
+		
+		if (! defined $send_cookie) {
+			print authenticate_error();
+		}
 	} elsif ($page eq "logOut") {
-     	delete $cookies_db{$cookie->value};
+		bless $received_cookie, CGI::Cookie;
+     	delete $cookies_db{$received_cookie->value};
 		print home_page(); 
 		store \%cookies_db, $cookies_path
 	}
@@ -86,91 +93,58 @@ sub cgi_main {
 
 
 sub new_cookie {
-	my $c = CGI::Cookie->new(-name => 'name', -value => param('login'));
+	my $login = shift;
+	my $c = CGI::Cookie->new(-name => 'Username', -value => $login);
    $cookies_db{param('login')} = $c;
 	return $c;
 }
 
-# Run when login to give them an existing cookie or make a new one
-sub validate_cookie {
-   $name = param('login');      
-   if (! exists $cookies_db{$name}) {
-      $validcookie = new_cookie();
-   } else {
-      $validcookie = CGI::Cookie->parse($cookies_db{$name});
-   }
-   bless $validcookie, CGI::Cookie;
+# Run when login to give them an existing cookie if password matches
+sub give_cookie {
+	($name, $password) = @_;
+	my $validcookie;
+	if (authenticate($name,$password)) {
+		$validcookie = new_cookie($name);
+	}
 	return $validcookie;
 }
 
 # Checks if the given cookie exists in db and that it is logged in.
 sub check_cookie {
+	my $valid = 0;
 	if (defined $_[0]) {
 		$user = $_[0];
 		bless $user, CGI::Cookie;
 		if (defined $user) {
 			my $name = $user->value;
-		   $check_cookie = $cookies_db{$name};
+		   my $check_cookie = $cookies_db{$name};
 			
 		   if (defined $check_cookie) {
-				bless $check_cookie, CGI::Cookie;
-		      $return_cookie = $check_cookie;
-
-		   } else {
-				undef $return_cookie;
-			}
+				$valid = 1;
+		   }
 		}
-	} else {
-		undef $return_cookie;
 	}
-   return $return_cookie;
+   return $valid;
 }
 
 # Home	
 sub home_page {
-	return <<eof;
-	<div class="container">
-	<p></p>
-	</div> <!-- /container -->
-	<div class="container">
-    	<div class="hero-unit">
-	    <h1>Mekong</h1>
-	    <p>Tagline</p>
-	    <p>
-	    </a>
-	    </p>
-    	</div><!-- .hero-unit -->
-	</div> <!-- /container -->
-
-eof
+	open F, "home_page.html";
+	my @lines = <F>;
+	return join "",@lines;
 }
 
+sub authenticate_error {
+	open F, "authenticate_error.html";
+	my @lines = <F>;
+	return join "",@lines;
+}
 
 # simple login form without authentication	
 sub login_form {
-	return <<eof;
-
-	<div class="container">
-		<div class="span3">
-		</div><!-- .span3 -->
-
-		<div class="span6">
-		<div class="hero-unit">
-			<form class="form-signin">
-			<h2 class="form-signin-heading">Sign in</h2>
-			<input type="text" class="input-block-level" placeholder="Login" name="login">
-			<button class="btn btn-large btn-primary" type="submit" name="page" value="postLogin">Submit</button>
-			</form>
-		</div><!-- .hero-unit -->
-		</div><!-- .span6 -->
-
-		<div class="span3">
-		</div><!-- .span3 -->
-	</div> <!-- /container -->
-
-
-
-eof
+	open F, "login_form.html";
+	my @lines = <F>;
+	return join "",@lines;
 }
 
 
@@ -178,30 +152,9 @@ eof
 
 # simple search form
 sub search_form {
-	return <<eof;
-	<div class="container">
-	<div class="hero-unit">
-	<form role="form">
-  		<div class="form-group">
-    		<input type="text" class="form-control" name="searchTerms" placeholder="Product Name">
-  		</div>
-
-  		<div class="form-group">
-    		<input type="text" class="form-control" name="productID" placeholder="Product ID">
-  		</div>
-
-  		<div class="checkbox">
-    		<label>
-      		<input type="checkbox"> Checkbox
-    		</label>
-  		</div>
-
-  		<button type="submit" class="btn btn-default" name="page" value="Results">Submit</button>
-	</form>
-	</div> <!-- .hero-unit -->
-	</div> <!-- /container -->
-
-eof
+	open F, "search_form.html";
+	my @lines = <F>;
+	return join "",@lines;
 }
 
 # ascii display of search results
@@ -209,18 +162,16 @@ sub search_results {
 	my ($search_terms) = @_;
 	my @matching_isbns = search_books($search_terms);
 	my $descriptions = get_book_descriptions(@matching_isbns);
-	return <<eof;
-	<div class="container">
-	<div class="hero-unit">
-		<p>Search results for \"$search_terms\"
-		<p>@matching_isbns
-		<pre>
-			$descriptions
-		</pre>
-		<p>
-	</div> <!-- .hero-unit -->
-	</div> <!-- /container -->
-eof
+	$matching_isbns = join "\n", @matching_isbns;
+	$search_terms = join " ", $search_terms;
+	my %template_variables = (
+		search_terms => $search_terms,
+		matching_isbns => $matching_isbns,
+		descriptions => $descriptions
+	);
+ 	$template = HTML::Template->new(filename => "search_results.template", die_on_bad_params => 0);
+	$template->param(%template_variables);
+	return $template->output;
 }
 
 #
@@ -231,58 +182,35 @@ sub page_header_noUser() {
 	my $search = "";
 	my $help = "";
 	my $arg = shift;
-   my $cookie = shift;
-   bless $cookie, CGI::Cookie if defined $cookie;
 	if ($arg eq "Login") {
 	   $login = "active";
+		$search = "inactive";
+		$help = "inactive";
 	} elsif ($arg eq "Search") {
 	   $search = "active";
+		$login = "inactive";
+		$help = "inactive";
 	} elsif ($arg eq "Help") {
 	   $help = "active";
+		$search = "inactive";
+		$login = "inactive";
+	} else {
+	   $help = "inactive";
+		$search = "inactive";
+		$login = "inactive";
 	}
-   if (defined $cookie) {
-	   print header(-cookie=>$cookie);
-   } else {
-      print header;
-   }
-	return <<eof;
-<!DOCTYPE html>
-<html lang="en">
-<head>
-	<title>mekong</title>
-	<link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/css/bootstrap-combined.min.css" rel="stylesheet">
-	
-</head>
-<body>
-<div class="container">
-   <div class="navbar navbar-inverse navbar-fixed-top">
-      <div class="navbar-inner">
-        <div class="container">
-          <a class="brand" href="./mekong.cgi">Mekong</a>
-          <div class="nav-collapse collapse">
-            <ul class="nav">
-              <li class="$login">
-                <a href="./mekong.cgi?page=Login">Login</a>
-              </li>
-              <li class="$search">
-                <a href="./mekong.cgi?page=Search">Advanced Search</a>
-              </li>
-              <li class="$help">
-                <a href="./mekong.cgi?page=Help">Help</a>
-              </li>
 
-            </ul>
-          </div>
-	  <div class="nav-collapse collapse">
-              <form class="navbar-search pull-right">
-    		<input type="text" class="search-query" placeholder="Search">
-    	      </form>
-  	  </div>
-	</div>
-      </div>
-   </div>
-</div> <!-- /container -->
-eof
+	my %template_variables = (
+		login => $login,
+		search => $search,
+		help => $help
+	);
+	my $template = HTML::Template->new(filename => "page_noUser.template", die_on_bad_params => 0);
+	$template->param(%template_variables);
+   print header;
+	print $template->output;
+	
+
 
 }
 
@@ -299,53 +227,27 @@ sub page_header_user() {
    bless $cookie, CGI::Cookie if defined $cookie;
 	if ($arg eq "User") {
 	   $user = "active";
+		$search = "inactive";
+		$help = "inactive";
 	} elsif ($arg eq "Search") {
 	   $search = "active";
+		$user = "inactive";
+		$help = "inactive";
 	} elsif ($arg eq "Help") {
 	   $help = "active";
+		$search = "inactive";
+		$user = "inactive";
 	}
-   $header =  header(-cookie=>$cookie);
-	return <<eof;
-$header
-<!DOCTYPE html>
-<html lang="en">
-<head>
-	<title>mekong</title>
-	<link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/css/bootstrap-combined.min.css" rel="stylesheet">
-</head>
-<body>
-<div class="container">
-   <div class="navbar navbar-inverse navbar-fixed-top">
-      <div class="navbar-inner">
-        <div class="container">
-          <a class="brand" href="./mekong.cgi">Mekong</a>
-          <div class="nav-collapse collapse">
-            <ul class="nav">
-              <li class="$user">
-                <a href="./mekong.cgi?page=Login">User</a>
-              </li>
-              <li class="$search">
-                <a href="./mekong.cgi?page=Search">Advanced Search</a>
-              </li>
-              <li class="$help">
-                <a href="./mekong.cgi?page=Help">Help</a>
-              </li>
-				  <li class="">
-                <a href="./mekong.cgi?page=logOut">Logout</a>
-              </li>
-
-            </ul>
-          </div>
-	  <div class="nav-collapse collapse">
-              <form class="navbar-search pull-right">
-    		<input type="text" class="search-query" placeholder="Search">
-    	      </form>
-  	  </div>
-	</div>
-      </div>
-   </div>
-</div> <!-- /container -->
-eof
+	my %template_variables = (
+		login => $login,
+		search => $search,
+		help => $help
+	);
+   $cookie->bake if defined $cookie;
+	my $template = HTML::Template->new(filename => "page_User.template", die_on_bad_params => 0);
+	$template->param(%template_variables);
+   print header;
+	print $template->output;
 
 }
 
@@ -378,11 +280,12 @@ sub debugging_info() {
 	print "<hr>\n<h4>Debugging information - parameter values supplied to $0</h4>\n<pre>";
 	print "key of current user ", $key, "\n" if defined $key; 
 	print "User cookie: ", $user_cookie_list{$key}, "\n" if defined $key;
-	print "cookies: ", keys %cookies_db, "\n";
-	print "return cookie: ", $return_cookie, "\n" if defined $return_cookie;
+	print "cookies: ", keys %user_cookie_list, "\n";
+	print "send coookie: ", $send_cookie, "\n" if defined $return_cookie;
 	print "name: ", $user->value, "\n" if defined $user;
-   print $params;
+   print "valid ", $valid, "\n";
    print "Cookie: ", $cookie, "\n" if defined $cookie;
+	print $message;
 	print "</pre>";
 }
 
@@ -488,7 +391,6 @@ sub total_books {
 sub authenticate {
 	my ($login, $password) = @_;
 	our (%user_details, $last_error);
-	
 	return 0 if !legal_login($login);
 	if (!open(USER, "$users_dir/$login")) {
 		$last_error = "User '$login' does not exist.";
@@ -520,7 +422,6 @@ sub authenticate {
 sub read_books {
 	my ($books_file) = @_;
 	our %book_details;
-	print STDERR "read_books($books_file)\n" if $debug;
 	open BOOKS, $books_file or die "Can not open books file '$books_file'\n";
 	my $isbn;
 	while (<BOOKS>) {
@@ -532,7 +433,6 @@ sub read_books {
 		my ($field, $value);
 		if (($field, $value) = /^\s*"([^"]+)"\s*:\s*"(.*)",?\s*$/) {
 			$attribute_names{$field}++;
-			print STDERR "$isbn $field-> $value\n" if $debug > 1;
 			$value =~ s/([^\\]|^)\\"/$1"/g;
 	  		$book_details{$isbn}{$field} = $value;
 		} elsif (($field) = /^\s*"([^"]+)"\s*:\s*\[\s*$/) {
@@ -545,7 +445,6 @@ sub read_books {
 	  		$value = join("\n", @a);
 			$value =~ s/([^\\]|^)\\"/$1"/g;
 	  		$book_details{$isbn}{$field} = $value;
-	  		print STDERR "book{$isbn}{$field}=@a\n" if $debug > 1;
 		}
 	}
 	close BOOKS;
@@ -565,7 +464,6 @@ sub search_books {
 sub search_books1 {
 	my (@search_terms) = @_;
 	our %book_details;
-	print STDERR "search_books1(@search_terms)\n" if $debug;
 	my @unknown_fields = ();
 	foreach $search_term (@search_terms) {
 		push @unknown_fields, "'$1'" if $search_term =~ /([^:]+):/ && !$attribute_names{$1};
@@ -576,9 +474,7 @@ sub search_books1 {
 		my $n_matches = 0;
 		if (!$book_details{$isbn}{'=default_search='}) {
 			$book_details{$isbn}{'=default_search='} = ($book_details{$isbn}{title} || '')."\n".($book_details{$isbn}{authors} || '');
-			print STDERR "$isbn default_search -> '".$book_details{$isbn}{'=default_search='}."'\n" if $debug;
 		}
-		print STDERR "search_terms=@search_terms\n" if $debug > 1;
 		foreach $search_term (@search_terms) {
 			my $search_type = "=default_search=";
 			my $term = $search_term;
@@ -586,7 +482,6 @@ sub search_books1 {
 				$search_type = $1;
 				$term = $2;
 			}
-			print STDERR "term=$term\n" if $debug > 1;
 			while ($term =~ s/<([^">]*)"[^"]*"([^>]*)>/<$1 $2>/g) {}
 			$term =~ s/<[^>]+>/ /g;
 			next if $term !~ /\w/;
@@ -596,7 +491,6 @@ sub search_books1 {
 			$term =~ s/^/\\b/g;
 			$term =~ s/$/\\b/g;
 			next BOOK if !defined $book_details{$isbn}{$search_type};
-			print STDERR "search_type=$search_type term=$term book=$book_details{$isbn}{$search_type}\n" if $debug;
 			my $match;
 			eval {
 				my $field = $book_details{$isbn}{$search_type};

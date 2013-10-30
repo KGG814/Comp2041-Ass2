@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>mekong</title>
+	<link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/css/bootstrap-combined.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container">
+   <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <a class="brand" href="./mekong.cgi">Mekong</a>
+          <div class="nav-collapse collapse">
+            <ul class="nav">
+              <li class="<TMPL_VAR NAME=user>">
+                <a href="./mekong.cgi?page=Login">User</a>
+              </li>
+              <li class="<TMPL_VAR NAME=search>">
+                <a href="./mekong.cgi?page=Search">Advanced Search</a>
+              </li>
+              <li class="<TMPL_VAR NAME=help>">
+                <a href="./mekong.cgi?page=Help">Help</a>
+              </li>
+				  <li class="">
+                <a href="./mekong.cgi?page=logOut">Logout</a>
+              </li>
+
+            </ul>
+          </div>
+	  <div class="nav-collapse collapse">
+              <form class="navbar-search pull-right">
+    		<input type="text" class="search-query" placeholder="Search">
+    	      </form>
+  	  </div>
+	</div>
+      </div>
+   </div>
+</div> <!-- /container -->
