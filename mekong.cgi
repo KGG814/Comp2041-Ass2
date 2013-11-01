@@ -22,7 +22,7 @@ sub cgi_main {
    # Set some variables
    set_global_variables();
    # Read in books
-   # Setup Cookies
+   # Setup Cookiesrandom_regex(".{8}")
    my $cookies_path = 'cookies';
 	my $status = eval '%{retrieve($cookies_path)}';
 	my $received_cookie;
@@ -41,8 +41,8 @@ sub cgi_main {
    # Get the user's cookie
    %user_cookie_list = CGI::Cookie->fetch;
 	for $key (keys %user_cookie_list) {
-		if ($key eq "Username") {
-			$received_cookie = $user_cookie_list{"Username"};
+		if ($key eq "Session ID") {
+			$received_cookie = $user_cookie_list{"Session ID"};
 		}
 	}
    # Check if their cookie exists in system and they are logged in, or give
@@ -74,28 +74,34 @@ sub cgi_main {
 		print search_form();
 	} elsif ($page eq "Login") {
 		print login_form();
-	} elsif ($page eq "postLogin") {
-		
-      store \%cookies_db, $cookies_path;
-		
+	} elsif ($page eq "postLogin") {	
 		if (! defined $send_cookie) {
 			print authenticate_error();
 		}
+	} elsif ($page eq "register_form") {
+		print register_form();
+	} elsif ($page eq "post_register") {
+		my $username = param('username');
+		my $error;
+		if (-r "$users_dir/$username") {
+			$error = "User already Exists";
+		}
+		print register_form($error);
 	} elsif ($page eq "logOut") {
-		bless $received_cookie, CGI::Cookie;
      	delete $cookies_db{$received_cookie->value};
 		print home_page(); 
-		store \%cookies_db, $cookies_path
+		
 	}
-	
 	print page_trailer();
+	store \%cookies_db, $cookies_path
 }
 
 
 sub new_cookie {
-	my $login = shift;
-	my $c = CGI::Cookie->new(-name => 'Username', -value => $login);
-   $cookies_db{param('login')} = $c;
+	my $name = shift;
+	my $Session_ID = generate_Session_ID();
+	my $c = CGI::Cookie->new(-name => 'Session ID', -value => $Session_ID);
+   $cookies_db{$Session_ID} = $name;
 	return $c;
 }
 
@@ -109,17 +115,17 @@ sub give_cookie {
 	return $validcookie;
 }
 
-# Checks if the given cookie exists in db and that it is logged in.
+# Checks if the Session ID is valid.
 sub check_cookie {
 	my $valid = 0;
 	if (defined $_[0]) {
-		$user = $_[0];
+		my $user = $_[0];
 		bless $user, CGI::Cookie;
 		if (defined $user) {
-			my $name = $user->value;
-		   my $check_cookie = $cookies_db{$name};
+			my $Session_ID = $user->value;
+		   my $check_ID = $cookies_db{$Session_ID};
 			
-		   if (defined $check_cookie) {
+		   if (defined $check_ID) {
 				$valid = 1;
 		   }
 		}
@@ -157,6 +163,23 @@ sub search_form {
 	return join "",@lines;
 }
 
+# simple search form
+sub register_form {
+	my $error = $_[0];
+	if (defined $error) {
+		my %template_variables = (
+		error => $error,
+		);
+		$message = $template_variables{'error'};
+		my $template = HTML::Template->new(filename => "error.template", die_on_bad_params => 0);
+		$template->param(%template_variables);
+		print $template->output;
+	}
+	open F, "register_form.html";
+	my @lines = <F>;
+	return join "",@lines;
+}
+
 # ascii display of search results
 sub search_results {
 	my ($search_terms) = @_;
@@ -178,32 +201,27 @@ sub search_results {
 # HTML at top of every screen, if no user is logged in
 #
 sub page_header_noUser() {
-	my $login = "";
-	my $search = "";
-	my $help = "";
+	my $login = "inactive";
+	my $search = "inactive";
+	my $help = "inactive";
+	my $register = "inactive";
 	my $arg = shift;
 	if ($arg eq "Login") {
 	   $login = "active";
-		$search = "inactive";
-		$help = "inactive";
+
 	} elsif ($arg eq "Search") {
 	   $search = "active";
-		$login = "inactive";
-		$help = "inactive";
 	} elsif ($arg eq "Help") {
 	   $help = "active";
-		$search = "inactive";
-		$login = "inactive";
-	} else {
-	   $help = "inactive";
-		$search = "inactive";
-		$login = "inactive";
+	} elsif ($arg eq "register_form"){
+	   $register = "active";
 	}
 
 	my %template_variables = (
 		login => $login,
 		search => $search,
-		help => $help
+		help => $help,
+		register => $register
 	);
 	my $template = HTML::Template->new(filename => "page_noUser.template", die_on_bad_params => 0);
 	$template->param(%template_variables);
@@ -215,33 +233,43 @@ sub page_header_noUser() {
 }
 
 
+sub generate_Session_ID {
+
+ my @chars=('a'..'z','A'..'Z','0'..'9');
+ my $Session_ID;
+ foreach (1..16) {
+   $Session_ID.=$chars[rand @chars];
+ }
+
+ return $Session_ID;
+}
+
+#Generate the random string
+my $random_string=&generate_random_string(11);
+
+print "$random_string";
+
 #
 # HTML at top of every screen, if the user is logged in
 #
 sub page_header_user() {
-	my $user = "";
-	my $search = "";
-	my $help = "";
+	my $user = "inactive";
+	my $search = "inactive";
+	my $help = "inactive";
 	my $arg = shift;
    my $cookie = shift;
    bless $cookie, CGI::Cookie if defined $cookie;
 	if ($arg eq "User") {
 	   $user = "active";
-		$search = "inactive";
-		$help = "inactive";
 	} elsif ($arg eq "Search") {
 	   $search = "active";
-		$user = "inactive";
-		$help = "inactive";
 	} elsif ($arg eq "Help") {
 	   $help = "active";
-		$search = "inactive";
-		$user = "inactive";
 	}
 	my %template_variables = (
 		login => $login,
 		search => $search,
-		help => $help
+		help => $help,
 	);
    $cookie->bake if defined $cookie;
 	my $template = HTML::Template->new(filename => "page_User.template", die_on_bad_params => 0);
@@ -277,14 +305,8 @@ sub debugging_info() {
 		$params .= "param($p)=".param($p)."\n"
 	}
    
-	print "<hr>\n<h4>Debugging information - parameter values supplied to $0</h4>\n<pre>";
-	print "key of current user ", $key, "\n" if defined $key; 
-	print "User cookie: ", $user_cookie_list{$key}, "\n" if defined $key;
-	print "cookies: ", keys %user_cookie_list, "\n";
-	print "send coookie: ", $send_cookie, "\n" if defined $return_cookie;
-	print "name: ", $user->value, "\n" if defined $user;
-   print "valid ", $valid, "\n";
-   print "Cookie: ", $cookie, "\n" if defined $cookie;
+	print "<hr>\n<h4>Debugging information - parameter values supplied to $0</h4>\n<pre>"; 
+	print "Session ID: ", $user_cookie_list{'Session ID'}->value;
 	print $message;
 	print "</pre>";
 }

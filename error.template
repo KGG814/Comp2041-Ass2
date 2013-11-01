@@ -1,0 +1,13 @@
+<div class="container">
+	<div class="span3">
+	</div><!-- .span3 -->
+
+	<div class="span6">
+		<div class="alert alert-danger">
+			<TMPL_VAR NAME=error>
+		</div><!-- .alert alert-danger -->
+	</div><!-- .span4 -->
+
+	<div class="span3">
+	</div><!-- .span4 -->
+</div> <!-- /container -->
