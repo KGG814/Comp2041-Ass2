@@ -1,6 +1,7 @@
 name=admin
-street=high street
+email=totemboy814@gmail.com
+password=password
+address=high street
 city=sydney
 state=NSW
 postcode=2000
-password=password

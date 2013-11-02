@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>mekong</title>
+<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+<link href="bootstrap/css/bootstrap-responsive.min.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<div class="container">
+	<div class="navbar navbar-inverse navbar-fixed-top">
+		<div class="navbar-inner">
+			<div class="container">
+			<a class="brand" href="./mekong.cgi">Mekong</a>
+				<div class="nav-collapse collapse">
+					<ul class="nav">
+					<li class=<TMPL_VAR NAME=register>>
+					 <a href="./mekong.cgi?page=register_form">Register</a>
+					<li class=<TMPL_VAR NAME=login>>
+					 <a href="./mekong.cgi?page=Login">Login</a>
+					</li>
+					<li class=<TMPL_VAR NAME=help>>
+					 <a href="./mekong.cgi?page=Help">Help</a>
+					</li>
+					</ul>
+				</div>
+				<div class="nav-collapse collapse">
+					<form class="navbar-search pull-right">
+					<input type="text" class="search-query" placeholder="Search" name='searchTerms'>
+					</form>
+				</div>
+			</div>  
+		</div>
+	</div>
+</div> <!-- /container -->
+<br><br><br>

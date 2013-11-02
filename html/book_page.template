@@ -1,0 +1,52 @@
+<div class="container text-center">
+	<h2><TMPL_VAR NAME=title></h2>
+	<h3><font color="grey">By <TMPL_VAR NAME=authors></font></h3>
+</div> <!-- /container -->
+
+<div class="container">
+
+	<div class="span4">
+	<a class="thumbnail">
+	<img src="<TMPL_VAR NAME=largeimageurl>">
+	</a>
+	</div><!-- .span4 -->
+
+	<div class="span5">
+		<div class="well">
+		<TMPL_VAR NAME=productdescription>
+		</div>
+		
+	</div><!-- .span5 -->
+
+	<div class="span2">
+		<div class="alert">
+				<h3>Add to Basket</h3>	
+				<h4>Price: <TMPL_VAR NAME=price></h4>	
+				<br>		
+				<h4><TMPL_VAR NAME=basket></h4>
+		</div>
+		
+		<table class="table">
+			<thead>
+			 <tr>
+				<th><h4><font color="80B0E2">Product details</font></h4></th>
+			 </tr>
+			</thead>
+			<tbody>
+			 <tr>
+				<td><strong>Number of pages:</strong> <TMPL_VAR NAME=numpages></td>
+			 </tr>
+			<tr>
+				<td><strong>Publisher:</strong> <TMPL_VAR NAME=publisher></td>
+			</tr>
+			<tr>
+				<td><strong>Edition:</strong> <TMPL_VAR NAME=edition></td>
+			</tr>
+			<tr>
+				<td><strong>ISBN:</strong> <TMPL_VAR NAME=isbn></td>
+			</tr>
+			</tbody>			
+		</table>
+	</div><!-- .span2 -->
+</div> <!-- /container -->
+

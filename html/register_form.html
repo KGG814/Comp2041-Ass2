@@ -1,0 +1,89 @@
+	<div class="container">
+		<div class="span3">
+		</div><!-- .span3 -->
+		
+		<div class="span6">
+				<div class="hero-unit">
+			
+				<form class="form-signin" method="post" name="register" onsubmit="return validateForm()">
+				<h2>Make a new account</h2>
+				<input type="text" class="input-block-level" placeholder="Name" name="name">
+				<br><br>
+				<input type="text" class="input-block-level" placeholder="Username" name="username">	
+				<input type="text" class="input-block-level" placeholder="Email" name="email">
+				<input type="password" class="input-block-level" placeholder="Password" name="password">
+				<input type="password" class="input-block-level" placeholder="Confirm Password" name="confirm_password">
+				<br><br>
+				<input type="text" class="input-block-level" placeholder="Address" name="address">
+				<input type="text" class="input-block-level" placeholder="City" name="city">
+				<input type="text" class="input-block-level" placeholder="State" name="state">
+				<input type="text" class="input-block-level" placeholder="Post Code" name="post_code">
+				<button class="btn btn-large btn-primary" type="submit" name="page" value="post_register">Submit</button>
+				</form>
+				</div><!-- .hero-unit -->
+		</div><!-- .span6 -->
+
+		<div class="span3">
+		</div><!-- .span3 -->
+	</div> <!-- /container -->
+
+<script>
+	function validateForm() {
+		var password=document.forms["register"]["password"].value;
+		var confirm=document.forms["register"]["confirm_password"].value;
+		var username=document.forms["register"]["username"].value;
+		var email=document.forms["register"]["email"].value;
+		var address=document.forms["register"]["address"].value;
+		var city=document.forms["register"]["city"].value
+		var post_code=document.forms["register"]["post_code"].value;
+		var name=document.forms["register"]["name"].value;
+
+		var patt1 = /\W/;
+		var patt2 = /^\d{4}$/;
+		var patt3 = /.{5}/;
+		var patt4 = /^$/;
+		var patt5 = /@/;
+		var error = "";
+		if (patt4.test(name)) {
+			error = error + "Name must not be empty\n\n";
+		}
+		if (patt4.test(address)) {
+			error = error + "Address must not be empty\n\n";
+		}
+		if (patt4.test(city)) {
+			error = error + "City must not be empty\n\n";
+		}
+		if (patt1.test(username)) {
+			error = error + "Username must be alphanumeric\n\n";
+		}
+		if (patt1.test(address)) {
+			error = error + "Address must be alphanumeric\n\n";
+		}
+		if (patt1.test(city)) {
+			error = error + "City must be alphanumeric\n\n";
+		}
+		if (!patt3.test(username)) {
+			error = error + "Username must be at least 5 characters long\n\n";
+		}
+		if (!patt3.test(password)) {
+			error = error + "Password must be at least 5 characters long\n\n";
+		}
+		if (patt1.test(city)) {
+			error = error + "City must be alphanumeric\n\n";
+		}
+		if (!patt2.test(post_code)) {
+			error = error + "Invalid post code\n\n";
+		}
+		if (password!=confirm) {
+			error = error + "Passwords did not match\n\n";
+		}
+		if (!patt5.test(email)) {
+			error = error + "Invalid email\n\n";
+		}
+		if (error!="") {
+			alert(error);
+			return false;
+		}
+		return true;
+	}
+</script>

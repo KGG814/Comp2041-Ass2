@@ -1,0 +1,17 @@
+	<div class="container">
+		<h3>Search results for "<TMPL_VAR NAME=search_terms>"</h3>
+		<table class="table table-striped">
+		  <thead>
+		    <tr>
+		      <th>ISBN</th>
+				<th>Image</th>
+		      <th>Title</th>
+		      <th>Author</th>
+				<th>Price</th>
+		    </tr>
+		  </thead>
+		  <tbody>
+		  
+       
+
+

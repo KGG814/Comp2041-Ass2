@@ -1,0 +1,16 @@
+<form name="addToBasket" onsubmit="return validateInput()" >
+<input type="number" class="input-block-level" placeholder="Quantity" name="quantity">
+<button class="btn btn-medium btn-primary" type="number" name="page" value="addToBasket">Register</button>
+</form>
+
+<script>
+	function validateInput() {
+		var quantity=document.forms["addToBasket"]["quantity"].value;
+		var patt = /^\d+$/;
+		if (!patt.test(quantity)) {
+			alert("Quantity must be numerical");
+			return false;
+		}
+		return true;
+	}
+</script>

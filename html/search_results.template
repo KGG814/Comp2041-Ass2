@@ -1,0 +1,8 @@
+	<div class="container">
+	<div class="hero-unit">
+		<p>Search results for <TMPL_VAR NAME=search_terms>
+
+
+		<p>
+	</div> <!-- .hero-unit -->
+	</div> <!-- /container -->

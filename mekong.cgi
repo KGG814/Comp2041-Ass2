@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
-# written by andrewt@cse.unsw.edu.au October 2013
-# as a starting point for COMP2041 assignment 2
-# http://www.cse.unsw.edu.au/~cs2041/assignments/mekong/
+
 
 use CGI qw/:all/;
 use CGI;
@@ -10,8 +8,16 @@ use CGI::Carp qw(warningsToBrowser fatalsToBrowser);
 use HTML::Template;
 use Storable;
 
+require 'scripts/forms.pl';
+require 'scripts/pages.pl';
+require 'scripts/cookies.pl';
+require 'scripts/backend.pl';
+require 'scripts/page_headers.pl';
+require 'scripts/search.pl';
+require 'scripts/read_books.pl';
+
 warningsToBrowser(1);
-$debug = 1;
+$debug = 0;
 $| = 1;
 cgi_main();
 exit 0;
@@ -21,9 +27,9 @@ exit 0;
 sub cgi_main {
    # Set some variables
    set_global_variables();
-   # Read in books
-   # Setup Cookiesrandom_regex(".{8}")
-   my $cookies_path = 'cookies';
+
+   # Setup Cookies
+   my $cookies_path = 'data/cookies';
 	my $status = eval '%{retrieve($cookies_path)}';
 	my $received_cookie;
 	%cookies_db = %{retrieve($cookies_path)} if defined $status;
@@ -38,13 +44,8 @@ sub cgi_main {
 		$page = "Home";
 	}
 
-   # Get the user's cookie
-   %user_cookie_list = CGI::Cookie->fetch;
-	for $key (keys %user_cookie_list) {
-		if ($key eq "Session ID") {
-			$received_cookie = $user_cookie_list{"Session ID"};
-		}
-	}
+	$received_cookie = get_cookie();
+
    # Check if their cookie exists in system and they are logged in, or give
    # them a cookie if they just logged in
 	if ($page eq "postLogin") {
@@ -63,237 +64,15 @@ sub cgi_main {
 	} else {
 		page_header_noUser($page);
    }
-
+	# Read in books
    read_books($books_file);
 	
-	if (defined param('searchTerms')) {
-		print search_results(param('searchTerms'));
-	} elsif ($page eq "Home") {
-		print home_page();
-	} elsif ($page eq "Search") {
-		print search_form();
-	} elsif ($page eq "Login") {
-		print login_form();
-	} elsif ($page eq "postLogin") {	
-		if (! defined $send_cookie) {
-			print authenticate_error();
-		}
-	} elsif ($page eq "register_form") {
-		print register_form();
-	} elsif ($page eq "post_register") {
-		my $username = param('username');
-		my $error;
-		if (-r "$users_dir/$username") {
-			$error = "User already Exists";
-		}
-		print register_form($error);
-	} elsif ($page eq "logOut") {
-     	delete $cookies_db{$received_cookie->value};
-		print home_page(); 
-		
-	}
+	serve_page($page, $send_cookie, $received_cookie);
 	print page_trailer();
 	store \%cookies_db, $cookies_path
 }
 
 
-sub new_cookie {
-	my $name = shift;
-	my $Session_ID = generate_Session_ID();
-	my $c = CGI::Cookie->new(-name => 'Session ID', -value => $Session_ID);
-   $cookies_db{$Session_ID} = $name;
-	return $c;
-}
-
-# Run when login to give them an existing cookie if password matches
-sub give_cookie {
-	($name, $password) = @_;
-	my $validcookie;
-	if (authenticate($name,$password)) {
-		$validcookie = new_cookie($name);
-	}
-	return $validcookie;
-}
-
-# Checks if the Session ID is valid.
-sub check_cookie {
-	my $valid = 0;
-	if (defined $_[0]) {
-		my $user = $_[0];
-		bless $user, CGI::Cookie;
-		if (defined $user) {
-			my $Session_ID = $user->value;
-		   my $check_ID = $cookies_db{$Session_ID};
-			
-		   if (defined $check_ID) {
-				$valid = 1;
-		   }
-		}
-	}
-   return $valid;
-}
-
-# Home	
-sub home_page {
-	open F, "home_page.html";
-	my @lines = <F>;
-	return join "",@lines;
-}
-
-sub authenticate_error {
-	open F, "authenticate_error.html";
-	my @lines = <F>;
-	return join "",@lines;
-}
-
-# simple login form without authentication	
-sub login_form {
-	open F, "login_form.html";
-	my @lines = <F>;
-	return join "",@lines;
-}
-
-
-
-
-# simple search form
-sub search_form {
-	open F, "search_form.html";
-	my @lines = <F>;
-	return join "",@lines;
-}
-
-# simple search form
-sub register_form {
-	my $error = $_[0];
-	if (defined $error) {
-		my %template_variables = (
-		error => $error,
-		);
-		$message = $template_variables{'error'};
-		my $template = HTML::Template->new(filename => "error.template", die_on_bad_params => 0);
-		$template->param(%template_variables);
-		print $template->output;
-	}
-	open F, "register_form.html";
-	my @lines = <F>;
-	return join "",@lines;
-}
-
-# ascii display of search results
-sub search_results {
-	my ($search_terms) = @_;
-	my @matching_isbns = search_books($search_terms);
-	my $descriptions = get_book_descriptions(@matching_isbns);
-	$matching_isbns = join "\n", @matching_isbns;
-	$search_terms = join " ", $search_terms;
-	my %template_variables = (
-		search_terms => $search_terms,
-		matching_isbns => $matching_isbns,
-		descriptions => $descriptions
-	);
- 	$template = HTML::Template->new(filename => "search_results.template", die_on_bad_params => 0);
-	$template->param(%template_variables);
-	return $template->output;
-}
-
-#
-# HTML at top of every screen, if no user is logged in
-#
-sub page_header_noUser() {
-	my $login = "inactive";
-	my $search = "inactive";
-	my $help = "inactive";
-	my $register = "inactive";
-	my $arg = shift;
-	if ($arg eq "Login") {
-	   $login = "active";
-
-	} elsif ($arg eq "Search") {
-	   $search = "active";
-	} elsif ($arg eq "Help") {
-	   $help = "active";
-	} elsif ($arg eq "register_form"){
-	   $register = "active";
-	}
-
-	my %template_variables = (
-		login => $login,
-		search => $search,
-		help => $help,
-		register => $register
-	);
-	my $template = HTML::Template->new(filename => "page_noUser.template", die_on_bad_params => 0);
-	$template->param(%template_variables);
-   print header;
-	print $template->output;
-	
-
-
-}
-
-
-sub generate_Session_ID {
-
- my @chars=('a'..'z','A'..'Z','0'..'9');
- my $Session_ID;
- foreach (1..16) {
-   $Session_ID.=$chars[rand @chars];
- }
-
- return $Session_ID;
-}
-
-#Generate the random string
-my $random_string=&generate_random_string(11);
-
-print "$random_string";
-
-#
-# HTML at top of every screen, if the user is logged in
-#
-sub page_header_user() {
-	my $user = "inactive";
-	my $search = "inactive";
-	my $help = "inactive";
-	my $arg = shift;
-   my $cookie = shift;
-   bless $cookie, CGI::Cookie if defined $cookie;
-	if ($arg eq "User") {
-	   $user = "active";
-	} elsif ($arg eq "Search") {
-	   $search = "active";
-	} elsif ($arg eq "Help") {
-	   $help = "active";
-	}
-	my %template_variables = (
-		login => $login,
-		search => $search,
-		help => $help,
-	);
-   $cookie->bake if defined $cookie;
-	my $template = HTML::Template->new(filename => "page_User.template", die_on_bad_params => 0);
-	$template->param(%template_variables);
-   print header;
-	print $template->output;
-
-}
-
-
-#
-# HTML at bottom of every screen
-#
-sub page_trailer() {
-	my $debugging_info = "";
-	if ($debug) {
-		$debugging_info = debugging_info();
-	}
-	return <<eof;
-	$debugging_info
-</body>
-</html>
-eof
-}
 
 #
 # Print out information for debugging purposes
@@ -312,8 +91,6 @@ sub debugging_info() {
 }
 
 
-
-
 ###
 ### Below here are utility functions
 ### Most are unused by the code above, but you will 
@@ -321,51 +98,6 @@ sub debugging_info() {
 ### 
 ###
 
-# return true if specified string can be used as a login
-
-sub legal_login {
-	my ($login) = @_;
-	our ($last_error);
-
-	if ($login !~ /^[a-zA-Z][a-zA-Z0-9]*$/) {
-		$last_error = "Invalid login '$login': logins must start with a letter and contain only letters and digits.";
-		return 0;
-	}
-	if (length $login < 3 || length $login > 8) {
-		$last_error = "Invalid login: logins must be 3-8 characters long.";
-		return 0;
-	}
-	return 1;
-}
-
-# return true if specified string can be used as a password
-
-sub legal_password {
-	my ($password) = @_;
-	our ($last_error);
-	
-	if ($password =~ /\s/) {
-		$last_error = "Invalid password: password can not contain white space.";
-		return 0;
-	}
-	if (length $password < 5) {
-		$last_error = "Invalid password: passwords must contain at least 5 characters.";
-		return 0;
-	}
-	return 1;
-}
-
-
-# return true if specified string could be an ISBN
-
-sub legal_isbn {
-	my ($isbn) = @_;
-	our ($last_error);
-	
-	return 1 if $isbn =~ /^\d{9}(\d|X)$/;
-	$last_error = "Invalid isbn '$isbn' : an isbn must be exactly 10 digits.";
-	return 0;
-}
 
 
 # return true if specified string could be an credit card number
@@ -407,70 +139,8 @@ sub total_books {
 	return $total;
 }
 
-# return true if specified login & password are correct
-# user's details are stored in hash user_details
 
-sub authenticate {
-	my ($login, $password) = @_;
-	our (%user_details, $last_error);
-	return 0 if !legal_login($login);
-	if (!open(USER, "$users_dir/$login")) {
-		$last_error = "User '$login' does not exist.";
-		return 0;
-	}
-	my %details =();
-	while (<USER>) {
-		next if !/^([^=]+)=(.*)/;
-		$details{$1} = $2;
-	}
-	close(USER);
-	foreach $field (qw(name street city state postcode password)) {
-		if (!defined $details{$field}) {
- 	 	 	$last_error = "Incomplete user file: field $field missing";
-			return 0;
-		}
-	}
-	if ($details{"password"} ne $password) {
-  	 	$last_error = "Incorrect password.";
-		return 0;
-	 }
-	 %user_details = %details;
-  	 return 1;
-}
 
-# read contents of files in the books dir into the hash book
-# a list of field names in the order specified in the file
- 
-sub read_books {
-	my ($books_file) = @_;
-	our %book_details;
-	open BOOKS, $books_file or die "Can not open books file '$books_file'\n";
-	my $isbn;
-	while (<BOOKS>) {
-		if (/^\s*"(\d+X?)"\s*:\s*{\s*$/) {
-			$isbn = $1;
-			next;
-		}
-		next if !$isbn;
-		my ($field, $value);
-		if (($field, $value) = /^\s*"([^"]+)"\s*:\s*"(.*)",?\s*$/) {
-			$attribute_names{$field}++;
-			$value =~ s/([^\\]|^)\\"/$1"/g;
-	  		$book_details{$isbn}{$field} = $value;
-		} elsif (($field) = /^\s*"([^"]+)"\s*:\s*\[\s*$/) {
-			$attribute_names{$1}++;
-			my @a = ();
-			while (<BOOKS>) {
-				last if /^\s*\]\s*,?\s*$/;
-				push @a, $1 if /^\s*"(.*)"\s*,?\s*$/;
-			}
-	  		$value = join("\n", @a);
-			$value =~ s/([^\\]|^)\\"/$1"/g;
-	  		$book_details{$isbn}{$field} = $value;
-		}
-	}
-	close BOOKS;
-}
 
 # return books matching search string
 
@@ -651,83 +321,6 @@ sub read_order {
 ### Your do not need to use these funtions
 ###
 
-sub console_main {
-	set_global_variables();
-	$debug = 1;
-	foreach $dir ($orders_dir,$baskets_dir,$users_dir) {
-		if (! -d $dir) {
-			print "Creating $dir\n";
-			mkdir($dir, 0777) or die("Can not create $dir: $!");
-		}
-	}
-	read_books($books_file);
-	my @commands = qw(login new_account search details add drop basket checkout orders quit);
-	my @commands_without_arguments = qw(basket checkout orders quit);
-	my $login = "";
-	
-	print "mekong.com.au - ASCII interface\n";
-	while (1) {
-		$last_error = "";
-		print "> ";
-		$line = <STDIN> || last;
-		$line =~ s/^\s*>\s*//;
-		$line =~ /^\s*(\S+)\s*(.*)/ || next;
-		($command, $argument) = ($1, $2);
-		$command =~ tr/A-Z/a-z/;
-		$argument = "" if !defined $argument;
-		$argument =~ s/\s*$//;
-		
-		if (
-			$command !~ /^[a-z_]+$/ ||
-			!grep(/^$command$/, @commands) ||
-			grep(/^$command$/, @commands_without_arguments) != ($argument eq "") ||
-			($argument =~ /\s/ && $command ne "search")
-		) {
-			chomp $line;
-			$line =~ s/\s*$//;
-			$line =~ s/^\s*//;
-			incorrect_command_message("$line");
-			next;
-		}
-
-		if ($command eq "quit") {
-			print "Thanks for shopping at mekong.com.au.\n";
-			last;
-		}
-		if ($command eq "login") {
-			$login = login_command($argument);
-			next;
-		} elsif ($command eq "new_account") {
-			$login = new_account_command($argument);
-			next;
-		} elsif ($command eq "search") {
-			search_command($argument);
-			next;
-		} elsif ($command eq "details") {
-			details_command($argument);
-			next;
-		}
-		
-		if (!$login) {
-			print "Not logged in.\n";
-			next;
-		}
-		
-		if ($command eq "basket") {
-			basket_command($login);
-		} elsif ($command eq "add") {
-			add_command($login, $argument);
-		} elsif ($command eq "drop") {
-			drop_command($login, $argument);
-		} elsif ($command eq "checkout") {
-			checkout_command($login);
-		} elsif ($command eq "orders") {
-			orders_command($login);
-		} else {
-			warn "internal error: unexpected command $command";
-		}
-	}
-}
 
 sub login_command {
 	my ($login) = @_;
@@ -751,61 +344,8 @@ sub login_command {
 	return $login;
 }
 
-sub new_account_command {
-	my ($login) = @_;
-	if (!legal_login($login)) {
-		print "$last_error\n";
-		return "";
-	}
-	if (-r "$users_dir/$login") {
-		print "Invalid user name: login already exists.\n";
-		return "";
-	}
-	if (!open(USER, ">$users_dir/$login")) {
-		print "Can not create user file $users_dir/$login: $!";
-		return "";
-	}
-	foreach $description (@new_account_rows) {
-		my ($name, $label)  = split /\|/, $description;
-		next if $name eq "login";
-		my $value;
-		while (1) {
-			print "$label ";
-			$value = <STDIN>;
-			exit 1 if !$value;
-			chomp $value;
-			if ($name eq "password" && !legal_password($value)) {
-				print "$last_error\n";
-				next;
-			}
-			last if $value =~ /\S+/;
-		}
-		$user_details{$name} = $value;
-		print USER "$name=$value\n";
-	}
-	close(USER);
-	print "Welcome to mekong.com.au, $login.\n";
-	return $login;
-}
 
-sub search_command {
-	my ($search_string) = @_;
-	$search_string =~ s/\s*$//;
-	$search_string =~ s/^\s*//;
-	search_command1(split /\s+/, $search_string);
-}
 
-sub search_command1 {
-	my (@search_terms) = @_;
-	my @matching_isbns = search_books1(@search_terms);
-	if ($last_error) {
-		print "$last_error\n";
-	} elsif (@matching_isbns) {
-		print_books(@matching_isbns);
-	} else {
-		print "No books matched.\n";
-	}
-}
 
 sub details_command {
 	my ($isbn) = @_;
@@ -925,62 +465,8 @@ sub print_books(@) {
 	print get_book_descriptions(@isbns);
 }
 
-# return descriptions of specified books
-sub get_book_descriptions {
-	my @isbns = @_;
-	my $descriptions = "";
-	our %book_details;
-	foreach $isbn (@isbns) {
-		die "Internal error: unknown isbn $isbn in print_books\n" if !$book_details{$isbn}; # shouldn't happen
-		my $title = $book_details{$isbn}{title} || "";
-		my $authors = $book_details{$isbn}{authors} || "";
-		$authors =~ s/\n([^\n]*)$/ & $1/g;
-		$authors =~ s/\n/, /g;
-		$descriptions .= sprintf "%s %7s %s - %s\n", $isbn, $book_details{$isbn}{price}, $title, $authors;
-	}
-	return $descriptions;
-}
-
-sub set_global_variables {
-	$base_dir = ".";
-	$books_file = "$base_dir/books.json";
-	$orders_dir = "$base_dir/orders";
-	$baskets_dir = "$base_dir/baskets";
-	$users_dir = "$base_dir/users";
-	$last_error = "";
-	%user_details = ();
-	%book_details = ();
-	%attribute_names = ();
-	@new_account_rows = (
-		  'login|Login:|10',
-		  'password|Password:|10',
-		  'name|Full Name:|50',
-		  'street|Street:|50',
-		  'city|City/Suburb:|25',
-		  'state|State:|25',
-		  'postcode|Postcode:|25',
-		  'email|Email Address:|35'
-		  );
-}
 
 
-sub incorrect_command_message {
-	my ($command) = @_;
-	print "Incorrect command: $command.\n";
-	print <<eof;
-Possible commands are:
-login <login-name>
-new_account <login-name>                    
-search <words>
-details <isbn>
-add <isbn>
-drop <isbn>
-basket
-checkout
-orders
-quit
-eof
-}
 
 
 

@@ -1,0 +1,5 @@
+	<div class="container">
+	<div class="hero-unit">
+		<h2>Welcome back <TMPL_VAR NAME=login></h2>
+	</div> <!-- .hero-unit -->
+	</div> <!-- /container -->
