@@ -12,6 +12,7 @@ sub give_cookie {
 	my $validcookie;
 	if (authenticate($name,$password)) {
 		$validcookie = new_cookie($name);
+		$username = $name;
 	}
 	return $validcookie;
 }
@@ -24,8 +25,8 @@ sub check_cookie {
 		bless $user, CGI::Cookie;
 		if (defined $user) {
 			my $Session_ID = $user->value;
-		   my $check_ID = $cookies_db{$Session_ID};		
-		   if (defined $check_ID) {
+		   $username = $cookies_db{$Session_ID};		
+		   if (defined $username) {
 				$valid = 1;
 		   }
 		}

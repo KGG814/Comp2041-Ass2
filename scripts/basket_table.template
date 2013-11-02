@@ -1,0 +1,10 @@
+
+ <tr>
+   <td><TMPL_VAR NAME=isbn></td>
+	<td><TMPL_VAR NAME=quantity></td>
+   <td><a href="./mekong.cgi?page=Book&isbn=<TMPL_VAR NAME=isbn>"><TMPL_VAR NAME=title></a></td>
+   <td><TMPL_VAR NAME=authors></td>
+   <td><TMPL_VAR NAME=price></td>
+ </tr>
+
+

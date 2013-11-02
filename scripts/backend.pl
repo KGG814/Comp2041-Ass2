@@ -94,10 +94,9 @@ sub legal_login {
 
 sub serve_page {
 	($page, $send_cookie, $received_cookie) = @_;
+	$page  = "" if (! defined $page);
 	if (defined param('searchTerms')) {
 		search_results(param('searchTerms'));
-	} elsif ($page eq "Home") {
-		print home_page();
 	} elsif ($page eq "Login") {
 		print login_form();
 	} elsif ($page eq "postLogin") {	
@@ -115,18 +114,14 @@ sub serve_page {
      	delete $cookies_db{$received_cookie->value};
 		print home_page(); 	
 	} elsif ($page eq "Book") { 
-		$isbn = param('isbn');
-		my %template_variables = %{$book_details{$isbn}};
-		my $template = HTML::Template->new(filename => "html/book_page.template", die_on_bad_params => 0);
-		if ($valid) {
-			open F, "html/basket.html";
-			my @lines = <F>;
-			$template_variables{'basket'} = join "",@lines;
-		} else {
-			$template_variables{'basket'} = "Please login to checkout";
-		}
-		$template->param(%template_variables);
-		print $template->output;
+		books();
+	} elsif ($page eq "basket") { 
+		basket_page();
+	} elsif (defined param('book_order')) {
+		add_basket(param('book_order'),param('quantity'));
+		basket_page();
+	} else {
+		print home_page();
 	}
 }
 1

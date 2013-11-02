@@ -17,7 +17,7 @@ require 'scripts/search.pl';
 require 'scripts/read_books.pl';
 
 warningsToBrowser(1);
-$debug = 0;
+$debug = 1;
 $| = 1;
 cgi_main();
 exit 0;
@@ -38,11 +38,6 @@ sub cgi_main {
 
    # Get Page
    my $page = param('page');
-
-   # Defaults to home
-	if (! defined $page) {
-		$page = "Home";
-	}
 
 	$received_cookie = get_cookie();
 
@@ -218,44 +213,64 @@ sub search_books1 {
 # return books in specified user's basket
 
 sub read_basket {
-	my ($login) = @_;
 	our %book_details;
-	open F, "$baskets_dir/$login" or return ();
-	my @isbns = <F>;
-
+	my %basket;
+	open F, "$baskets_dir/$username" or return ();
+	while(<F>) {
+		$_ =~ /(\d{9}\w) (\d+)/;
+		$basket{$1} = $2 if defined $1;
+	}
 	close(F);
-	chomp(@isbns);
-	!$book_details{$_} && die "Internal error: unknown isbn $_ in basket\n" foreach @isbns;
-	return @isbns;
+	return %basket;
 }
 
 
 # delete specified book from specified user's basket
-# only first occurance is deleted
 
 sub delete_basket {
-	my ($login, $delete_isbn) = @_;
-	my @isbns = read_basket($login);
-	open F, ">$baskets_dir/$login" or die "Can not open $baskets_dir/$login: $!";
-	foreach $isbn (@isbns) {
+	my ($delete_isbn) = @_;
+
+	my %basket = read_basket($username);
+	
+	foreach $isbn (keys %basket) {
 		if ($isbn eq $delete_isbn) {
-			$delete_isbn = "";
+			delete $basket{$isbn};
 			next;
 		}
-		print F "$isbn\n";
 	}
-	close(F);
-	unlink "$baskets_dir/$login" if ! -s "$baskets_dir/$login";
+	write_basket(%basket);
 }
 
+
+
+
+sub write_basket {
+	my (%basket) = @_;
+	open F, ">$baskets_dir/$username" or die "Can not open $baskets_dir/$username: $!";
+	foreach $isbn (keys %basket) {
+		print F "$isbn $basket{$isbn}\n";
+	}
+	close(F);
+	if (! -s "$baskets_dir/$username") {
+		unlink "$baskets_dir/$username"; 
+	}
+}
 
 # add specified book to specified user's basket
 
 sub add_basket {
-	my ($login, $isbn) = @_;
-	open F, ">>$baskets_dir/$login" or die "Can not open $baskets_dir/$login::$! \n";
-	print F "$isbn\n";
-	close(F);
+	my ($add_isbn, $quantity) = @_;
+	if ($valid) {
+		my %basket = read_basket();
+		foreach $isbn (keys %basket) {
+			if ($isbn eq $add_isbn) {
+				$basket{$isbn} += $quantity;
+				break;
+			}
+		}
+		$basket{$add_isbn} = $quantity if (! defined $basket{$add_isbn});
+		write_basket(%basket);
+	}
 }
 
 
@@ -275,7 +290,7 @@ sub finalize_order {
 	print F ($order_number + 1);
 	close(F);
 
-	my @basket_isbns = read_basket($login);
+	my @basket_isbns = read_basket();
 	open ORDER,">$orders_dir/$order_number" or die "Can not open $orders_dir/$order_number:$! \n";
 	print ORDER "order_time=".time()."\n";
 	print ORDER "credit_card_number=$credit_card_number\n";
@@ -375,7 +390,7 @@ sub details_command {
 
 sub basket_command {
 	my ($login) = @_;
-	my @basket_isbns = read_basket($login);
+	my @basket_isbns = read_basket();
 	if (!@basket_isbns) {
 		print "Your shopping basket is empty.\n";
 	} else {
@@ -400,7 +415,7 @@ sub add_command {
 
 sub drop_command {
 	my ($login,$isbn) = @_;
-	my @basket_isbns = read_basket($login);
+	my @basket_isbns = read_basket();
 	if (!legal_isbn($argument)) {
 		print "$last_error\n";
 		return;
@@ -414,7 +429,7 @@ sub drop_command {
 
 sub checkout_command {
 	my ($login) = @_;
-	my @basket_isbns = read_basket($login);
+	my @basket_isbns = read_basket();
 	if (!@basket_isbns) {
 		print "Your shopping basket is empty.\n";
 		return;

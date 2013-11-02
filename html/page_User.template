@@ -14,7 +14,7 @@
           <div class="nav-collapse collapse">
             <ul class="nav">
               <li class="<TMPL_VAR NAME=user>">
-                <a href="./mekong.cgi?page=Login">User</a>
+                <a href="./mekong.cgi?page=basket">User</a>
               </li>
               <li class="<TMPL_VAR NAME=help>">
                 <a href="./mekong.cgi?page=Help">Help</a>
@@ -27,7 +27,7 @@
           </div>
 	  <div class="nav-collapse collapse">
 		  <form class="navbar-search pull-right">
-		     <input type="text" class="search-query" placeholder="Search", name='searchTerms'>
+		     <input type="text" class="search-query" placeholder="Search" name='searchTerms'>
 		  </form>
   	  </div>
 	</div>
