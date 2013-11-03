@@ -110,15 +110,21 @@ sub serve_page {
 	} elsif ($page eq "post_register") {
 		post_register();
 		
-	} elsif ($page eq "logOut") {
+	} elsif ($page eq "logOut" and $valid) {
      	delete $cookies_db{$received_cookie->value};
 		print home_page(); 	
 	} elsif ($page eq "Book") { 
 		books();
-	} elsif ($page eq "basket") { 
+	} elsif ($page eq "basket" and $valid) { 
+		basket_page();
+	} elsif ($page eq "remove" and $valid) { 
+		delete_basket(param('isbn'));
 		basket_page();
 	} elsif (defined param('book_order')) {
 		add_basket(param('book_order'),param('quantity'));
+		basket_page();
+	} elsif ($page eq "checkout" and $valid) {
+		finalize_order();
 		basket_page();
 	} else {
 		print home_page();

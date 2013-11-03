@@ -1,0 +1,14 @@
+ <tr>
+	<td><TMPL_VAR NAME=order_num></td>
+	</td>
+   <td><TMPL_VAR NAME=isbn></td>
+	</td>
+   <td><TMPL_VAR NAME=quantity></td>
+	</td>
+   <td><TMPL_VAR NAME=title></td>
+	</td>
+   <td><TMPL_VAR NAME=authors></td>
+	</td>
+   <td><TMPL_VAR NAME=price></td>
+	</td>
+ </tr>

@@ -1,0 +1,9 @@
+			</tbody>			
+			</table>
+		<div class="alert alert-success">
+		Total : <TMPL_VAR NAME=total>
+		<form><button class="btn btn-small btn-primary" type="submit" name="page" value="checkout">Checkout</button></form>
+		</div>
+	</div><!-- /span4 -->
+	
+

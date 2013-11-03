@@ -70,7 +70,6 @@ sub page_trailer() {
 		$debugging_info = debugging_info();
 	}
 	return <<eof;
-	$debugging_info
 </body>
 </html>
 eof
