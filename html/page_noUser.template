@@ -18,9 +18,6 @@
 					<li class=<TMPL_VAR NAME=login>>
 					 <a href="./mekong.cgi?page=Login">Login</a>
 					</li>
-					<li class=<TMPL_VAR NAME=help>>
-					 <a href="./mekong.cgi?page=Help">Help</a>
-					</li>
 					</ul>
 				</div>
 				<div class="nav-collapse collapse">

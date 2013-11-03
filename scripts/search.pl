@@ -27,9 +27,17 @@ sub search_results {
 	print $head->output;
 	foreach my $isbn (sort keys %descriptions) {
 		my %table_variables = (isbn => $isbn, image =>$book_details{$isbn}{'smallimageurl'});
+		my $add_to_basket;
 		foreach my $key (sort keys %{$descriptions{$isbn}}) {
 			$table_variables{$key} = $descriptions{$isbn}{$key};
 		}
+		if ($valid) {
+			$add_to_basket = "<form name=\"addToBasket\"> \n
+				<input type=\"hidden\" name=\"quantity\" value=\"1\">\n
+				<button class=\"btn btn-small btn-primary\" name=\"book_order\" value=$isbn>Add</button>\n
+				</form>\n"
+		}
+		$table_variables{'add_to_basket'} = $add_to_basket;
 		my $table = HTML::Template->new(filename => "html/search_results_table.template", die_on_bad_params => 0);
 		$table->param(%table_variables);
 		print $table->output;

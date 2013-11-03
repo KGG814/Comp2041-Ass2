@@ -16,9 +16,6 @@
               <li class="<TMPL_VAR NAME=user>">
                 <a href="./mekong.cgi?page=basket">User</a>
               </li>
-              <li class="<TMPL_VAR NAME=help>">
-                <a href="./mekong.cgi?page=Help">Help</a>
-              </li>
 				  <li class="">
                 <a href="./mekong.cgi?page=logOut">Logout</a>
               </li>

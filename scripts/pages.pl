@@ -19,7 +19,7 @@ sub post_register {
 			print register_form($error);
 		} else {
 			new_account(param('username'),param('name'),param('email'),param('password'),
-			param('address'),param('city'),param('state'),param('post_code'));
+			param('address'),param('city'),param('state'),param('post_code'), "0");
 		}
 }
 
@@ -48,6 +48,17 @@ sub books {
 	print $template->output;
 }
 
+sub validated {
+	open F, "html/validated.html";
+	my @lines = <F>;
+	return join "",@lines; 
+}
+
+sub recovery_page {
+	open F, "html/recovery_page.html";
+	my @lines = <F>;
+	return join "",@lines; 
+}
 
 
 1

@@ -1,6 +1,6 @@
 sub new_cookie {
 	my $name = shift;
-	my $Session_ID = generate_Session_ID();
+	my $Session_ID = generate_key();
 	my $c = CGI::Cookie->new(-name => 'Session ID', -value => $Session_ID);
    $cookies_db{$Session_ID} = $name;
 	return $c;
@@ -8,11 +8,12 @@ sub new_cookie {
 
 # Run when login to give them an existing cookie if password matches
 sub give_cookie {
-	($name, $password) = @_;
+	my ($name, $password) = @_;
 	my $validcookie;
-	if (authenticate($name,$password)) {
+	if (authenticate($name,$password) and $user_details{'validated'} eq "1") {
 		$validcookie = new_cookie($name);
 		$username = $name;
+		$valid = 1;
 	}
 	return $validcookie;
 }
@@ -45,14 +46,14 @@ sub get_cookie{
 	return $received_cookie;
 }
 
-#Generates a session ID
-sub generate_Session_ID {
+#Generates a key
+sub generate_key {
  my @chars=('a'..'z','A'..'Z','0'..'9');
- my $Session_ID;
+ my $key;
  foreach (1..16) {
-   $Session_ID.=$chars[rand @chars];
+   $key.=$chars[rand @chars];
  }
- return $Session_ID;
+ return $key;
 }
 
 1

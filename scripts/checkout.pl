@@ -8,13 +8,11 @@ sub finalize_order {
 		open ORDER, ">$orders_dir/$username.$order_number";
 		print ORDER "order_time=".time()."\n";
 		foreach $isbn (keys %basket) {
-			print ORDER "$isbn $basket{$isbn}";
+			print ORDER "$isbn $basket{$isbn}\n";
 		}
 		close(ORDER);
 		unlink "$baskets_dir/$username";	
 	}
 }
-
-
 
 1

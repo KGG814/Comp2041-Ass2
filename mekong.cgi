@@ -32,9 +32,15 @@ sub cgi_main {
 
    # Setup Cookies
    my $cookies_path = 'data/cookies';
-	my $status = eval '%{retrieve($cookies_path)}';
+	my $keys_path = 'data/keys';
+	my $reset_path = 'data/reset';
+	my $status1 = eval '%{retrieve($cookies_path)}';
+	my $status2 = eval '%{retrieve($keys_path)}';
+	my $status3 = eval '%{retrieve($reset_path)}';
 	my $received_cookie;
-	%cookies_db = %{retrieve($cookies_path)} if defined $status;
+	%cookies_db = %{retrieve($cookies_path)} if defined $status1;
+	%validate_keys = %{retrieve($keys_path)} if defined $status2;
+	%reset_keys = %{retrieve($reset_path)} if defined $status3;
 
 	$valid = 0;
 
@@ -66,7 +72,10 @@ sub cgi_main {
 	
 	serve_page($page, $send_cookie, $received_cookie);
 	print page_trailer();
-	store \%cookies_db, $cookies_path
+	
+	store \%cookies_db, $cookies_path;
+	store \%validate_keys, $keys_path;
+	store \%reset_keys, $reset_path;
 }
 
 

@@ -8,6 +8,7 @@
 		      <th>Title</th>
 		      <th>Author</th>
 				<th>Price</th>
+				<th>Add</th>
 		    </tr>
 		  </thead>
 		  <tbody>
